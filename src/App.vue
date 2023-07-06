@@ -13,11 +13,10 @@
       <label for="album" class="radio-label">Album</label>
     </div>
 
-      <div class="search-wrapper">
-        <input v-model="searchTerm" @keyup.enter="fetchData"
-          class="search-input" />
-        <button @click="fetchData" class="search-button">Search</button>
-      </div>
+    <div class="search-wrapper">
+      <input v-model="searchTerm" @keyup.enter="fetchData" class="search-input" :placeholder="placeholderText"/>
+      <button @click="fetchData" class="search-button">Search</button>
+    </div>
     <div class="artworks-container">
       <div v-for="item in artworks" :key="item.url" class="artwork-item">
         <template v-if="item.dummy === false">
@@ -39,23 +38,53 @@
       </div>
     </div>
   </div>
+  <div class="footer">
+    Made with ❤️ by <a href="http://www.aumken.com/" target="_blank" style="color: black">Aum Kendapadi</a>
+  </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { extractColors } from 'extract-colors'
 
 let searchTerm = ref('')
 let artworks = ref([])
-let entity = ref('song')
+let entity = ref('album')
 let isLoading = ref(false)
 let copy = ref(null)
+let fetched = ref(false)
+let placeholderText = ref('ex. Alive')
+
+watch(entity, (newValue, oldValue) => {
+  if (!fetched.value) {
+    if (newValue == 'album') {
+      onInit('Coldplay', 'album', '3')
+      placeholderText = ref('ex. Coldplay')
+    } else {
+      onInit('Alive', 'song', '3')
+      placeholderText = ref('ex. Alive')
+    }
+  }
+})
+
+onMounted(() => {
+  onInit('Coldplay', 'album', '3');
+})
+
+let timeoutId = null; // Declare a variable outside the function to store the timeout ID
 
 const copyToClipboard = (color) => {
+  copy.value = null;
   navigator.clipboard.writeText(color).then(() => {
     copy.value = color;
-    setTimeout(() => { copy.value = null; }, 2000);
+    if (timeoutId) {
+      clearTimeout(timeoutId); // Cancel the previous timeout if it exists
+    }
+    timeoutId = setTimeout(() => {
+      copy.value = null;
+      timeoutId = null; // Reset the timeout ID when the timeout ends
+    }, 2000);
     console.log(copy.value);
     console.log(`${color} copied to clipboard`);
   }, (err) => {
@@ -77,10 +106,58 @@ const getContrastColor = (color) => {
   return luma < 128 ? 'white' : 'black';
 }
 
+const onInit = async (searchTermInput, mediaType, resultLimit) => {
+  isLoading.value = true;
+  try {
+    artworks.value = []
+    const response = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTermInput)}&entity=${mediaType}&limit=${resultLimit}`);
+    artworks.value = await Promise.all(response.data.results.map(async item => {
+      const imageUrl = item.artworkUrl100.replace('100x100', '600x600');
+      let colors = [];
+      try {
+        const options = {
+          pixels: 64000,
+          distance: 0.22,
+          colorValidator: (red, green, blue, alpha = 255) => alpha > 250,
+          saturationDistance: 0.2,
+          lightnessDistance: 0.2,
+          hueDistance: 0.083333333,
+          crossOrigin: 'Anonymous' // use this to avoid client-side CORS
+        };
+        colors = await extractColors(imageUrl, options);
+        colors = colors.map(color => color.hex);
+      } catch (err) {
+        console.error(err);
+      }
+      return {
+        url: imageUrl,
+        title: mediaType === 'album' ? item.collectionName : item.trackName,
+        album: item.collectionName,
+        artist: item.artistName,
+        width: 600,
+        height: 600,
+        dummy: false,
+        colors
+      };
+    }));
+    while (artworks.value.length % 6 !== 0) {
+      artworks.value.push({ dummy: true });
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 
 
 const fetchData = async () => {
-  isLoading.value = true
+  if (searchTerm.value == "") {
+    return
+  }
+  fetched = true;
+  isLoading.value = true;
   try {
     artworks.value = []  // This line will clear the old results
     const response = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm.value)}&entity=${entity.value}&limit=25`)
@@ -134,12 +211,6 @@ const fetchData = async () => {
   left: 50%;
   transform: translateX(-50%);
   padding: 10px;
-  background-color: #28a745;
-  /* Bootstrap's .bg-success green color */
-  color: #ffffff;
-  /* white color for text */
-  border-color: #1e7e34;
-  /* darker green for border */
   border-radius: .25rem;
   z-index: 1000;
   font-family: 'Gotham-Bold';
@@ -176,24 +247,28 @@ const fetchData = async () => {
 
 @font-face {
   font-family: 'Gotham-Black';
-  src: url('./Gotham-Black.otf') format('opentype');
+  src: url('@/assets/Gotham-Black.otf') format('opentype');
 }
 
 @font-face {
   font-family: 'Gotham-Bold';
-  src: url('./Gotham-Bold.otf') format('opentype');
+  src: url('@/assets/Gotham-Bold.otf') format('opentype');
 }
 
 @font-face {
   font-family: 'Gotham-Light';
-  src: url('./Gotham-Light.otf') format('opentype');
+  src: url('@/assets/Gotham-Light.otf') format('opentype');
 }
+
 
 h1 {
   font-family: 'Gotham-Black';
   font-size: 3em;
   margin-top: 0;
   margin-bottom: 1rem;
+  background: linear-gradient(to right, #009fff, #ec2f4b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 h2 {
@@ -318,6 +393,7 @@ img {
 
 .radio-button {
   display: none;
+  
   /* Hide the default radio buttons */
 }
 
@@ -343,7 +419,17 @@ img {
 
 .radio-button:checked+.radio-label {
 
-  background-color: #3498db;
+  background-color: #009fff;
+
+  /* Change the background color when the radio button is checked */
+  color: white;
+  /* Change the text color when the radio button is checked */
+}
+
+.radio-label:hover {
+
+  background-color: #ec2f4b;
+
   /* Change the background color when the radio button is checked */
   color: white;
   /* Change the text color when the radio button is checked */
@@ -371,9 +457,10 @@ input {
 }
 
 .search-button {
+  
   height: 2rem;
   /* Adjust the height of the search button to match the height of the search box */
-  background-color: #3498db;
+  background-color: #ec2f4b;
   /* Give it a blue color */
   color: white;
   /* Make the text white */
@@ -389,7 +476,16 @@ input {
 }
 
 .search-button:hover {
-  background-color: #2980b9;
+  background-color: #009fff;
   /* Darken the background color when hovering over the button */
+}
+
+.footer {
+  bottom: 0;
+  width: 100%;
+  text-align: center;
+  padding: 20px 0;
+  font-family: 'Gotham-Light';
+  font-size: 1em;
 }
 </style>

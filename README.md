@@ -2,7 +2,7 @@
 
 Build a color palette based on your favorite song and album covers.
 
-Made with: Vue.js, Vite, JavaScript, HTML, CSS
+Made with: Vue.js, JavaScript, HTML, CSS
 
 Instructions:
 1. Install all necessary dependencies with `npm install`.

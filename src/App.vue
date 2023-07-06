@@ -54,7 +54,7 @@ let entity = ref('album')
 let isLoading = ref(false)
 let copy = ref(null)
 let fetched = ref(false)
-let placeholderText = ref('ex. Alive')
+let placeholderText = ref('ex. Coldplay')
 
 watch(entity, (newValue, oldValue) => {
   if (!fetched.value) {
